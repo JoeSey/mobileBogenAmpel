@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Bogen-Ampel</title>
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#0a0a0a">
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+  html, body {
+    margin: 0; padding: 0; height: 100%; width: 100%;
+    background: #0a0a0a; color: #eee;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    overflow: hidden;
+  }
+  #standalone-banner {
+    display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 999;
+    background: #d9822b; color: #1a1a1a; padding: 8px 12px; font-size: 14px; text-align: center;
+  }
+  #standalone-banner.show { display: block; }
+
+  /* ---------- Setup Screen ---------- */
+  #setup { height: 100%; overflow-y: auto; padding: 20px; }
+  #setup.hidden { display: none; }
+  #setup h1 { font-size: 22px; margin: 0 0 16px; }
+  #setup h2 { font-size: 15px; margin: 24px 0 8px; color: #9ad; text-transform: uppercase; letter-spacing: .05em; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 14px; margin-bottom: 4px; color: #bbb; }
+  .field input[type=number], .field input[type=text], .field select {
+    width: 100%; padding: 10px; font-size: 16px; border-radius: 8px;
+    border: 1px solid #444; background: #1c1c1c; color: #eee;
+  }
+  .row { display: flex; gap: 12px; }
+  .row .field { flex: 1; }
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #222; }
+  .toggle-row label { font-size: 14px; color: #ccc; }
+  .presets { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+  button {
+    font-family: inherit; font-size: 15px; padding: 12px 16px; border-radius: 10px;
+    border: 1px solid #444; background: #222; color: #eee; cursor: pointer;
+  }
+  button:active { background: #333; }
+  button.primary { background: #2c6e3f; border-color: #2c6e3f; color: #fff; }
+  button.key-assign { background: #1c1c1c; }
+  button.key-assign.listening { background: #6a4b1a; border-color: #d9822b; }
+  #start-btn { width: 100%; padding: 18px; font-size: 18px; margin-top: 24px; }
+  .key-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+  .key-row .code { font-size: 12px; color: #888; min-width: 90px; text-align: right; }
+  .hint { font-size: 12px; color: #777; margin-top: 4px; }
+
+  /* ---------- Display Screen ---------- */
+  #display { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+  #display.active { display: flex; }
+  #display.phase-bereit { background: #1a1a1a; }
+  #display.phase-warning { background: #b0221f; }
+  #display.phase-shooting { background: #1e7a34; }
+  #display.phase-yellow { background: #c9a227; }
+  #display.phase-red_end { background: #b0221f; }
+  #display.phase-fertig { background: #1a1a1a; }
+  #display.paused { background: #7a1614; }
+  #dg-label { font-size: 5vw; font-weight: 700; margin-bottom: 2vh; }
+  #dg-timer { font-size: 18vw; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+  #dg-group { font-size: 6vw; font-weight: 700; margin-top: 2vh; }
+  #dg-pass { font-size: 2.4vw; margin-top: .8vh; opacity: .7; }
+  #dg-sub { font-size: 3.2vw; margin-top: 1.5vh; opacity: .85; }
+  #dg-exit { position: absolute; top: 14px; left: 14px; opacity: .5; font-size: 13px; padding: 8px 12px; z-index: 10; }
+  .touch-zone { position: absolute; top: 0; bottom: 0; width: 50%; z-index: 1; }
+  #touch-a { left: 0; }
+  #touch-b { right: 0; }
+</style>
+</head>
+<body>
+
+<div id="standalone-banner">Für Vollbild-Betrieb: „Zum Home-Bildschirm hinzufügen" verwenden.</div>
+
+<div id="setup">
+  <h1>Bogen-Ampel — Setup</h1>
+
+  <h2>Presets</h2>
+  <div class="presets" id="presets"></div>
+
+  <h2>Zeiten</h2>
+  <div class="row">
+    <div class="field">
+      <label>Schießzeit (Sekunden)</label>
+      <input type="number" id="cfg-shootTime" min="1" value="120">
+    </div>
+    <div class="field">
+      <label>Vorwarnzeit „An die Linie" (Sekunden)</label>
+      <input type="number" id="cfg-warningTime" min="1" value="10">
+    </div>
+  </div>
+  <div class="row">
+    <div class="field">
+      <label>Gelbphase, letzte X Sekunden</label>
+      <input type="number" id="cfg-yellowTime" min="0" value="30">
+    </div>
+    <div class="field">
+      <label>Anzahl Passen</label>
+      <input type="number" id="cfg-numPasses" min="1" value="6">
+    </div>
+  </div>
+
+  <h2>Gruppen</h2>
+  <div class="field">
+    <label>Gruppen-Modus</label>
+    <select id="cfg-groupMode">
+      <option value="none">Keine Gruppen</option>
+      <option value="ab">A-B (eine Gruppe)</option>
+      <option value="abcd">A-B + C-D (zwei Gruppen nacheinander)</option>
+    </select>
+  </div>
+
+  <h2>Ton</h2>
+  <div class="toggle-row">
+    <label>Zusätzlicher Ton beim Wechsel in Gelbphase</label>
+    <input type="checkbox" id="cfg-yellowTone">
+  </div>
+
+  <h2>Texte</h2>
+  <div class="field">
+    <label>Text: Schießzeit</label>
+    <input type="text" id="cfg-textShoot" value="Schießzeit">
+  </div>
+  <div class="field">
+    <label>Text: Vorwarnphase</label>
+    <input type="text" id="cfg-textWarning" value="An die Linie">
+  </div>
+  <div class="field">
+    <label>Text: Start-Hinweis (Bereit-Phase)</label>
+    <input type="text" id="cfg-textStartHint" value="Taste A zum Starten">
+  </div>
+  <div class="field">
+    <label>Text: Zeit abgelaufen</label>
+    <input type="text" id="cfg-textTimeUp" value="Zeit abgelaufen">
+  </div>
+
+  <h2>Steuerung: Bluetooth-Clicker</h2>
+  <div class="key-row">
+    <span>Taste A (Start / Fortsetzen)</span>
+    <button class="key-assign" id="assign-a">zuweisen</button>
+    <span class="code" id="code-a">nicht gesetzt</span>
+  </div>
+  <div class="key-row">
+    <span>Taste B (Beenden / Doppelklick = Alarm)</span>
+    <button class="key-assign" id="assign-b">zuweisen</button>
+    <span class="code" id="code-b">nicht gesetzt</span>
+  </div>
+  <div class="hint">Nach „zuweisen" die gewünschte Taste am Clicker drücken. Doppelklick auf Taste B innerhalb von 500 ms löst Alarm aus.</div>
+
+  <h2>Touch-Fallback</h2>
+  <div class="toggle-row">
+    <label>Touch-Bedienung erlauben (linke Hälfte = Taste A, rechte Hälfte = Taste B Einzelklick, kein Alarm per Touch)</label>
+    <input type="checkbox" id="cfg-touchFallback">
+  </div>
+
+  <button id="start-btn" class="primary">Turnier starten</button>
+</div>
+
+<div id="display">
+  <button id="dg-exit">◀ Setup</button>
+  <div id="dg-label">Bereit</div>
+  <div id="dg-timer">--:--</div>
+  <div id="dg-group"></div>
+  <div id="dg-pass"></div>
+  <div id="dg-sub"></div>
+  <div class="touch-zone" id="touch-a"></div>
+  <div class="touch-zone" id="touch-b"></div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ---------------- Presets ----------------
+  var PRESETS = [
+    { name: 'Halle 3 Pfeile/2 Min', shootTime: 120, warningTime: 10, yellowTime: 30, numPasses: 6, groupMode: 'none' },
+    { name: 'Freiluft 6 Pfeile/4 Min', shootTime: 240, warningTime: 10, yellowTime: 30, numPasses: 10, groupMode: 'ab' },
+    { name: 'Freiluft 2 Gruppen', shootTime: 240, warningTime: 10, yellowTime: 30, numPasses: 12, groupMode: 'abcd' }
+  ];
+
+  var DEFAULT_CONFIG = {
+    shootTime: 120, warningTime: 10, yellowTime: 30, numPasses: 6,
+    groupMode: 'none', yellowTone: false, touchFallback: false,
+    keyA: null, keyB: null,
+    textShoot: 'Schießzeit', textWarning: 'An die Linie',
+    textStartHint: 'Taste A zum Starten', textTimeUp: 'Zeit abgelaufen'
+  };
+
+  var STORAGE_KEY = 'bogen-ampel-config';
+
+  function loadConfig() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return Object.assign({}, DEFAULT_CONFIG);
+      var parsed = JSON.parse(raw);
+      return Object.assign({}, DEFAULT_CONFIG, parsed);
+    } catch (e) {
+      return Object.assign({}, DEFAULT_CONFIG);
+    }
+  }
+
+  function saveConfig() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+  }
+
+  var config = loadConfig();
+
+  // ---------------- Setup screen wiring ----------------
+  var $ = function (id) { return document.getElementById(id); };
+
+  var fields = {
+    shootTime: $('cfg-shootTime'),
+    warningTime: $('cfg-warningTime'),
+    yellowTime: $('cfg-yellowTime'),
+    numPasses: $('cfg-numPasses'),
+    groupMode: $('cfg-groupMode'),
+    yellowTone: $('cfg-yellowTone'),
+    touchFallback: $('cfg-touchFallback'),
+    textShoot: $('cfg-textShoot'),
+    textWarning: $('cfg-textWarning'),
+    textStartHint: $('cfg-textStartHint'),
+    textTimeUp: $('cfg-textTimeUp')
+  };
+
+  function applyConfigToFields() {
+    fields.shootTime.value = config.shootTime;
+    fields.warningTime.value = config.warningTime;
+    fields.yellowTime.value = config.yellowTime;
+    fields.numPasses.value = config.numPasses;
+    fields.groupMode.value = config.groupMode;
+    fields.yellowTone.checked = !!config.yellowTone;
+    fields.touchFallback.checked = !!config.touchFallback;
+    fields.textShoot.value = config.textShoot;
+    fields.textWarning.value = config.textWarning;
+    fields.textStartHint.value = config.textStartHint;
+    fields.textTimeUp.value = config.textTimeUp;
+    $('code-a').textContent = config.keyA || 'nicht gesetzt';
+    $('code-b').textContent = config.keyB || 'nicht gesetzt';
+  }
+
+  function readFieldsIntoConfig() {
+    config.shootTime = Math.max(1, parseInt(fields.shootTime.value, 10) || 1);
+    config.warningTime = Math.max(0, parseInt(fields.warningTime.value, 10) || 0);
+    config.yellowTime = Math.max(0, parseInt(fields.yellowTime.value, 10) || 0);
+    config.numPasses = Math.max(1, parseInt(fields.numPasses.value, 10) || 1);
+    config.groupMode = fields.groupMode.value;
+    config.yellowTone = fields.yellowTone.checked;
+    config.touchFallback = fields.touchFallback.checked;
+    config.textShoot = fields.textShoot.value;
+    config.textWarning = fields.textWarning.value;
+    config.textStartHint = fields.textStartHint.value;
+    config.textTimeUp = fields.textTimeUp.value;
+    saveConfig();
+  }
+
+  Object.keys(fields).forEach(function (k) {
+    fields[k].addEventListener('change', readFieldsIntoConfig);
+  });
+
+  var presetsEl = $('presets');
+  PRESETS.forEach(function (p) {
+    var b = document.createElement('button');
+    b.textContent = p.name;
+    b.addEventListener('click', function () {
+      Object.assign(config, p);
+      applyConfigToFields();
+      saveConfig();
+    });
+    presetsEl.appendChild(b);
+  });
+
+  // key assignment
+  function wireKeyAssign(buttonId, codeId, configKey) {
+    var btn = $(buttonId);
+    btn.addEventListener('click', function () {
+      btn.classList.add('listening');
+      btn.textContent = 'Taste drücken...';
+      function onKey(e) {
+        e.preventDefault();
+        config[configKey] = e.code;
+        $(codeId).textContent = e.code;
+        saveConfig();
+        btn.classList.remove('listening');
+        btn.textContent = 'zuweisen';
+        window.removeEventListener('keydown', onKey, true);
+      }
+      window.addEventListener('keydown', onKey, true);
+    });
+  }
+  wireKeyAssign('assign-a', 'code-a', 'keyA');
+  wireKeyAssign('assign-b', 'code-b', 'keyB');
+
+  applyConfigToFields();
+
+  // standalone detection
+  var isStandalone = window.navigator.standalone === true ||
+    window.matchMedia('(display-mode: standalone)').matches;
+  if (!isStandalone) {
+    $('standalone-banner').classList.add('show');
+  }
+
+  // ---------------- Audio ----------------
+  var HONK_SRC = './honk.m4a';
+  var honkUnlocked = false;
+  var honkPool = [];
+  var honkPoolIndex = 0;
+  var HONK_POOL_SIZE = 5;
+
+  function unlockAudio() {
+    if (honkUnlocked) return;
+    honkUnlocked = true;
+    // Mehrere Elemente im Rahmen der User-Geste stumm anspielen, damit
+    // spätere programmatische Wiedergaben (aus Timern/rAF) auf iOS/Safari
+    // erlaubt sind. Ein einzelnes Element entsperrt nur sich selbst,
+    // deshalb ein kleiner Pool zum Wiederverwenden.
+    for (var i = 0; i < HONK_POOL_SIZE; i++) {
+      var a = new Audio(HONK_SRC);
+      a.volume = 0;
+      (function (el) {
+        el.play().then(function () {
+          el.pause();
+          el.currentTime = 0;
+          el.volume = 1;
+        }).catch(function () {});
+      })(a);
+      honkPool.push(a);
+    }
+  }
+
+  function honkOnce() {
+    var a = honkPool.length ? honkPool[honkPoolIndex] : new Audio(HONK_SRC);
+    if (honkPool.length) honkPoolIndex = (honkPoolIndex + 1) % honkPool.length;
+    a.currentTime = 0;
+    a.play().catch(function () { /* Datei evtl. nicht am Ablageort vorhanden */ });
+  }
+
+  // count honks, gapMs auseinander (Start zu Start)
+  function honkPattern(count, gapMs) {
+    for (var i = 0; i < count; i++) {
+      setTimeout(function () { honkOnce(); }, i * gapMs);
+    }
+  }
+
+  // ---------------- Wake Lock ----------------
+  var wakeLock = null;
+  function requestWakeLock() {
+    if ('wakeLock' in navigator) {
+      navigator.wakeLock.request('screen').then(function (wl) {
+        wakeLock = wl;
+      }).catch(function () { /* not available, ignore */ });
+    }
+  }
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible' && state.screen === 'display') {
+      requestWakeLock();
+    }
+  });
+
+  // ---------------- State machine ----------------
+  var state = {
+    screen: 'setup',
+    groups: [],
+    currentPass: 1,
+    currentGroupIndex: 0,
+    phase: 'bereit', // bereit | warning | shooting | yellow | red_end | fertig
+    phaseStart: 0,
+    phaseDuration: 0,
+    paused: false,
+    pausedRemaining: 0,
+    yellowTriggered: false,
+    lastBClick: 0,
+    bClickTimer: null
+  };
+
+  function groupsForMode(mode) {
+    if (mode === 'abcd') return ['A/B', 'C/D'];
+    if (mode === 'ab') return ['A/B'];
+    return [null];
+  }
+
+  function currentGroupLabel() {
+    var g = state.groups[state.currentGroupIndex];
+    return g ? (' – Gruppe ' + g) : '';
+  }
+
+  function currentGroupOnly() {
+    return state.groups[state.currentGroupIndex] || '';
+  }
+
+  function goToBereit() {
+    state.phase = 'bereit';
+    state.paused = false;
+  }
+
+  function startWarning() {
+    state.phase = 'warning';
+    state.phaseStart = Date.now();
+    state.phaseDuration = config.warningTime * 1000;
+    state.paused = false;
+    honkPattern(2, 250);
+  }
+
+  function startShooting() {
+    state.phase = 'shooting';
+    state.phaseStart = Date.now();
+    state.phaseDuration = config.shootTime * 1000;
+    state.yellowTriggered = false;
+    state.paused = false;
+    honkOnce();
+  }
+
+  function switchToYellow() {
+    state.phase = 'yellow';
+    state.yellowTriggered = true;
+    if (config.yellowTone) honkOnce();
+  }
+
+  function startRedEnd() {
+    state.phase = 'red_end';
+    state.phaseStart = Date.now();
+    state.phaseDuration = 2500;
+    state.paused = false;
+    honkPattern(3, 250);
+  }
+
+  function advanceAfterRedEnd() {
+    if (state.currentGroupIndex + 1 < state.groups.length) {
+      state.currentGroupIndex++;
+      goToBereit();
+    } else {
+      state.currentGroupIndex = 0;
+      if (state.currentPass + 1 <= config.numPasses) {
+        state.currentPass++;
+        goToBereit();
+      } else {
+        state.phase = 'fertig';
+      }
+    }
+  }
+
+  // force current timed phase to end immediately (Taste B single click / natural expiry)
+  function forceAdvance() {
+    if (state.phase === 'warning') { startShooting(); }
+    else if (state.phase === 'shooting' || state.phase === 'yellow') { startRedEnd(); }
+    else if (state.phase === 'red_end') { advanceAfterRedEnd(); }
+    // bereit / fertig: no-op
+  }
+
+  function triggerAlarm() {
+    if (state.phase === 'shooting' || state.phase === 'yellow' || state.phase === 'warning') {
+      var elapsed = Date.now() - state.phaseStart;
+      state.pausedRemaining = Math.max(0, state.phaseDuration - elapsed);
+      state.paused = true;
+      honkPattern(5, 190);
+    }
+  }
+
+  function resumeFromAlarm() {
+    state.phaseStart = Date.now() - (state.phaseDuration - state.pausedRemaining);
+    state.paused = false;
+  }
+
+  // ---------------- Key / touch actions ----------------
+  function actionA() {
+    unlockAudio();
+    if (state.paused) { resumeFromAlarm(); return; }
+    if (state.phase === 'bereit') { startWarning(); return; }
+    // otherwise ignore (already running)
+  }
+
+  function actionBSingle() {
+    if (state.paused) return; // while paused, B has no single-click meaning
+    forceAdvance();
+  }
+
+  function actionBClickEvent() {
+    var now = Date.now();
+    if (now - state.lastBClick < 500) {
+      // double click -> alarm, cancel pending single action
+      clearTimeout(state.bClickTimer);
+      state.bClickTimer = null;
+      state.lastBClick = 0;
+      triggerAlarm();
+    } else {
+      state.lastBClick = now;
+      state.bClickTimer = setTimeout(function () {
+        actionBSingle();
+        state.bClickTimer = null;
+      }, 500);
+    }
+  }
+
+  window.addEventListener('keydown', function (e) {
+    if (state.screen !== 'display') return;
+    if (config.keyA && e.code === config.keyA) { e.preventDefault(); actionA(); }
+    else if (config.keyB && e.code === config.keyB) { e.preventDefault(); actionBClickEvent(); }
+  });
+
+  $('touch-a').addEventListener('click', function () {
+    if (!config.touchFallback) return;
+    actionA();
+  });
+  $('touch-b').addEventListener('click', function () {
+    if (!config.touchFallback) return;
+    if (state.paused) return;
+    forceAdvance(); // touch has no alarm, always single-click behaviour
+  });
+
+  $('dg-exit').addEventListener('click', function () {
+    state.screen = 'setup';
+    $('display').classList.remove('active');
+    $('setup').classList.remove('hidden');
+  });
+
+  // ---------------- Render loop ----------------
+  var displayEl = $('display');
+  var labelEl = $('dg-label');
+  var timerEl = $('dg-timer');
+  var groupEl = $('dg-group');
+  var passEl = $('dg-pass');
+  var subEl = $('dg-sub');
+
+  function fmt(ms) {
+    var s = Math.max(0, Math.ceil(ms / 1000));
+    var m = Math.floor(s / 60);
+    var r = s % 60;
+    return (m < 10 ? '0' : '') + m + ':' + (r < 10 ? '0' : '') + r;
+  }
+
+  function render() {
+    if (state.screen !== 'display') return;
+
+    displayEl.className = 'active phase-' + state.phase + (state.paused ? ' paused' : '');
+    groupEl.textContent = currentGroupOnly();
+    passEl.textContent = state.currentPass + ' / ' + config.numPasses;
+
+    if (state.paused) {
+      labelEl.textContent = 'ALARM';
+      timerEl.textContent = fmt(state.pausedRemaining);
+      subEl.textContent = 'pausiert';
+      return;
+    }
+
+    switch (state.phase) {
+      case 'bereit':
+        labelEl.textContent = 'Bereit';
+        timerEl.textContent = '--:--';
+        subEl.textContent = config.textStartHint;
+        break;
+      case 'warning':
+        labelEl.textContent = config.textWarning;
+        timerEl.textContent = fmt(state.phaseDuration - (Date.now() - state.phaseStart));
+        subEl.textContent = '';
+        break;
+      case 'shooting':
+      case 'yellow':
+        labelEl.textContent = config.textShoot;
+        timerEl.textContent = fmt(state.phaseDuration - (Date.now() - state.phaseStart));
+        subEl.textContent = '';
+        break;
+      case 'red_end':
+        labelEl.textContent = config.textTimeUp;
+        timerEl.textContent = '00:00';
+        subEl.textContent = '';
+        break;
+      case 'fertig':
+        labelEl.textContent = 'Fertig';
+        timerEl.textContent = '';
+        groupEl.textContent = '';
+        passEl.textContent = '';
+        subEl.textContent = 'Alle Passen abgeschlossen';
+        break;
+    }
+  }
+
+  function tick() {
+    if (state.screen === 'display' && !state.paused) {
+      if (state.phase === 'warning' || state.phase === 'shooting' || state.phase === 'yellow' || state.phase === 'red_end') {
+        var elapsed = Date.now() - state.phaseStart;
+        var remaining = state.phaseDuration - elapsed;
+
+        if (state.phase === 'shooting' && !state.yellowTriggered &&
+            config.yellowTime > 0 && remaining <= config.yellowTime * 1000) {
+          switchToYellow();
+        }
+
+        if (remaining <= 0) {
+          if (state.phase === 'warning') startShooting();
+          else if (state.phase === 'shooting' || state.phase === 'yellow') startRedEnd();
+        }
+      }
+    }
+    render();
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  // ---------------- Start tournament ----------------
+  $('start-btn').addEventListener('click', function () {
+    readFieldsIntoConfig();
+    unlockAudio();
+    honkOnce(); // bestätigt Audio-Freigabe durch Nutzergeste
+
+    state.groups = groupsForMode(config.groupMode);
+    state.currentPass = 1;
+    state.currentGroupIndex = 0;
+    goToBereit();
+    state.screen = 'display';
+
+    $('setup').classList.add('hidden');
+    displayEl.classList.add('active');
+    requestWakeLock();
+  });
+
+  // ---------------- Service worker ----------------
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('./sw.js').catch(function () {});
+    });
+  }
+})();
+</script>
+</body>
+</html>
