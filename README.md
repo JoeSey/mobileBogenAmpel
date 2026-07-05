@@ -2,9 +2,13 @@
 
 Eine minimalistische Progressive Web App (PWA) zur Steuerung von Schießzeiten
 in Bogen-Trainingsturnieren (die Konformität mit allen Verbands-Regularien ist ungetestet,
-daher die Empfehlung für interne Turniere) – als Ampel-Anzeige mit 
+daher die Empfehlung nur für interne Turniere) – als Ampel-Anzeige mit 
 Bluetooth-Clicker-Unterstützung, gedacht für den Einsatz direkt auf dem Schießplatz, 
 komplett offline, falls kein Internet verfügbar.
+
+Auf dem Schießplatz für „einfach-so-Turniere“ ist es meist aufwändig, ein Laptop, Monitor
+und Lautsprecher mitzuschleppen. Ein Stativ, Halterung, Tablet und ein Bluetooth-Clicker 
+und eine Bluetooth-Box reichen da völlig aus!
 
 ## Was macht die App?
 
@@ -27,7 +31,7 @@ gedacht, das am Rand der Schießbahnen aufgestellt wird.
 - 🎮 Steuerung per Bluetooth-Clicker (frei zuweisbare Tasten):
   - **Taste A** – Start / Fortsetzen nach Alarm
   - **Taste B** – Phase manuell beenden (Einzelklick), **Alarm auslösen** (Doppelklick)
-- 👆 Touch-Fallback, falls kein Clicker zur Hand ist (linke Hälfte = Taste A, rechte Hälfte = Taste B, ohne Alarm-Funktion)
+- 👆 Touch-Fallback, falls kein BT-Clicker zur Hand ist (linke Hälfte = Taste A, rechte Hälfte = Taste B, ohne Alarm-Funktion)
 - 📋 Vordefinierte Presets für gängige Szenarien (Halle, Freiluft, Freiluft mit zwei Gruppen)
 - 📴 Funktioniert komplett offline dank Service Worker – ideal für die Schießwiese ohne Netzempfang
 - 💾 Einstellungen werden lokal gespeichert (localStorage) und bleiben nach dem Schließen erhalten
@@ -35,7 +39,10 @@ gedacht, das am Rand der Schießbahnen aufgestellt wird.
 
 ## Installation & Nutzung
 
-Die App braucht keinen Server-Unterbau, sie besteht aus reinem HTML/CSS/JS.
+Die App braucht keinen Server-Unterbau, sie besteht aus reinem HTML/CSS/JS. Die Seite wird einmal im Browser
+aufgerufen und dann auf den Home-Bildschirm gespeichert, fertig.
+
+Wer die App selbst installieren möchte:
 
 1. Repository klonen oder Dateien herunterladen
 2. Über einen einfachen HTTP-Server in einem Unterverzeichnis ausliefern
@@ -43,7 +50,7 @@ Die App braucht keinen Server-Unterbau, sie besteht aus reinem HTML/CSS/JS.
    ```bash
    npx serve .
    ```
-4. Im Browser öffnen und **„Zum Home-Bildschirm hinzufügen"** wählen, um die App im
+4. Dann geht es weiter wie oben beschrieben: Im Browser öffnen und **„Zum Home-Bildschirm hinzufügen"** wählen, um die App im
 5. Vollbild-/Standalone-Modus zu nutzen (empfohlen für den Einsatz auf der Wiese)
 
 ### Setup vor dem Turnier
@@ -75,4 +82,4 @@ Die App braucht keinen Server-Unterbau, sie besteht aus reinem HTML/CSS/JS.
 
 ## Lizenz
 
-MIT
+[MIT](LICENSE)
