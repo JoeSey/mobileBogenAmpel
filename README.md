@@ -23,6 +23,28 @@ mobileBogenAmpel bildet den klassischen Ablauf einer Schießpasse ab:
 Die App läuft im Vollbild und ist für die Anzeige auf einem Tablet (oder Smartphone) 
 gedacht, das am Rand der Schießbahnen aufgestellt wird.
 
+## Screenshots
+Einstellungen
+
+![Einstellungen](docs/IMG_0301.png)
+
+Bereit
+
+![Bereit](docs/IMG_0302.png)
+
+Countdown
+
+![Countdown](docs/IMG_0303.png)
+
+Schießzeit
+
+![Schießzeit](docs/IMG_0304.png)
+
+Zeit abgelaufen
+
+![Stop](docs/IMG_0305.png)
+
+
 ## Features
 
 - ⏱️ Frei konfigurierbare Zeiten (Schießzeit, Vorwarnzeit, Gelbphase, Anzahl Passen)
