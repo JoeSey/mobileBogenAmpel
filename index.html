@@ -117,6 +117,9 @@
     <label>Zusätzlicher Ton beim Wechsel in Gelbphase</label>
     <input type="checkbox" id="cfg-yellowTone">
   </div>
+  <div style="margin-top: 10px;">
+    <button id="test-honk-btn">▶ Signalton testen</button>
+  </div>
 
   <h2>Texte</h2>
   <div class="field">
@@ -293,6 +296,11 @@
   wireKeyAssign('assign-b', 'code-b', 'keyB');
 
   applyConfigToFields();
+
+  $('test-honk-btn').addEventListener('click', function () {
+    unlockAudio();
+    honkOnce();
+  });
 
   // standalone detection
   var isStandalone = window.navigator.standalone === true ||
