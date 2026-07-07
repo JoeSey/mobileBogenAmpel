@@ -117,6 +117,7 @@
     <label>Zusätzlicher Ton beim Wechsel in Gelbphase</label>
     <input type="checkbox" id="cfg-yellowTone">
   </div>
+
   <div style="margin-top: 10px;">
     <button id="test-honk-btn">▶ Signalton testen</button>
   </div>
@@ -282,8 +283,11 @@
       btn.textContent = 'Taste drücken...';
       function onKey(e) {
         e.preventDefault();
-        config[configKey] = e.code;
-        $(codeId).textContent = e.code;
+        // Media-Keys (z.B. AudioVolumeUp) haben in manchen Browsern e.code === ''
+        var keyId = e.code || e.key;
+        if (!keyId || keyId === 'Unidentified') return; // nochmal warten
+        config[configKey] = keyId;
+        $(codeId).textContent = keyId;
         saveConfig();
         btn.classList.remove('listening');
         btn.textContent = 'zuweisen';
@@ -502,8 +506,9 @@
 
   window.addEventListener('keydown', function (e) {
     if (state.screen !== 'display') return;
-    if (config.keyA && e.code === config.keyA) { e.preventDefault(); actionA(); }
-    else if (config.keyB && e.code === config.keyB) { e.preventDefault(); actionBClickEvent(); }
+    var keyId = e.code || e.key;
+    if (config.keyA && keyId === config.keyA) { e.preventDefault(); actionA(); }
+    else if (config.keyB && keyId === config.keyB) { e.preventDefault(); actionBClickEvent(); }
   });
 
   $('touch-a').addEventListener('click', function () {
