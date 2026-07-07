@@ -301,6 +301,11 @@
 
   applyConfigToFields();
 
+  $('test-honk-btn').addEventListener('click', function () {
+    unlockAudio();
+    honkOnce();
+  });
+
   // standalone detection
   var isStandalone = window.navigator.standalone === true ||
     window.matchMedia('(display-mode: standalone)').matches;
