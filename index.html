@@ -156,7 +156,7 @@
   <h2>Touch-Fallback</h2>
   <div class="toggle-row">
     <label>Touch-Bedienung erlauben (linke Hälfte = Taste A, rechte Hälfte = Taste B Einzelklick, kein Alarm per Touch)</label>
-    <input type="checkbox" id="cfg-touchFallback">
+    <input type="checkbox" id="cfg-touchFallback" checked />
   </div>
 
   <button id="start-btn" class="primary">Turnier starten</button>
@@ -186,7 +186,7 @@
 
   var DEFAULT_CONFIG = {
     shootTime: 120, warningTime: 10, yellowTime: 30, numPasses: 6,
-    groupMode: 'none', yellowTone: false, touchFallback: false,
+    groupMode: 'none', yellowTone: false, touchFallback: true,
     keyA: null, keyB: null,
     textShoot: 'Schießzeit', textWarning: 'An die Linie',
     textStartHint: 'Taste A zum Starten', textTimeUp: 'Zeit abgelaufen'
@@ -301,11 +301,6 @@
 
   applyConfigToFields();
 
-  $('test-honk-btn').addEventListener('click', function () {
-    unlockAudio();
-    honkOnce();
-  });
-
   // standalone detection
   var isStandalone = window.navigator.standalone === true ||
     window.matchMedia('(display-mode: standalone)').matches;
@@ -358,11 +353,16 @@
   // ---------------- Wake Lock ----------------
   var wakeLock = null;
   function requestWakeLock() {
-    if ('wakeLock' in navigator) {
-      navigator.wakeLock.request('screen').then(function (wl) {
-        wakeLock = wl;
-      }).catch(function () { /* not available, ignore */ });
-    }
+    if (!('wakeLock' in navigator)) return;
+    navigator.wakeLock.request('screen').then(function (wl) {
+      wakeLock = wl;
+      wl.addEventListener('release', function () {
+        // System hat Lock entzogen (z.B. App kurz im Hintergrund)
+        if (state.screen === 'display' && document.visibilityState === 'visible') {
+          requestWakeLock();
+        }
+      });
+    }).catch(function () { /* nicht verfügbar, ignorieren */ });
   }
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState === 'visible' && state.screen === 'display') {
