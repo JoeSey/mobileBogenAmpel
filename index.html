@@ -68,6 +68,15 @@
   .touch-zone { position: absolute; top: 0; bottom: 0; width: 50%; z-index: 1; }
   #touch-a { left: 0; }
   #touch-b { right: 0; }
+
+  /* ---------- Splash Screen ---------- */
+  #splash { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px; }
+  #splash.active { display: flex; }
+  #splash-top { font-size: 4vw; font-weight: 600; margin-bottom: 4vh; color: inherit; }
+  #splash-logo { max-width: 60vw; max-height: 40vh; object-fit: contain; display: none; }
+  #splash-logo.show { display: block; }
+  #splash-bottom { font-size: 3.2vw; margin-top: 4vh; color: inherit; opacity: .85; }
+  #splash-hint { position: absolute; bottom: 30px; font-size: 2vw; opacity: .5; }
 </style>
 </head>
 <body>
@@ -140,6 +149,32 @@
     <input type="text" id="cfg-textTimeUp" value="Zeit abgelaufen">
   </div>
 
+  <h2>Splash-Screen</h2>
+  <div class="toggle-row">
+    <label>Splash-Screen aktivieren</label>
+    <input type="checkbox" id="cfg-splashEnabled">
+  </div>
+  <div id="splash-config" style="display:none; margin-top: 12px;">
+    <div class="field">
+      <label>Text über dem Logo</label>
+      <input type="text" id="cfg-splashTop" value="">
+    </div>
+    <div class="field">
+      <label>Text unter dem Logo</label>
+      <input type="text" id="cfg-splashBottom" value="">
+    </div>
+    <div class="field">
+      <label>Hintergrundfarbe</label>
+      <input type="color" id="cfg-splashBg" value="#1a1a2e" style="width:60px; height:40px; padding:2px; border-radius:8px; border:1px solid #444; background:#1c1c1c; cursor:pointer;">
+    </div>
+    <div class="field">
+      <label>Logo (PNG/JPG/SVG)</label>
+      <input type="file" id="cfg-splashLogo" accept="image/*" style="font-size:14px; color:#bbb;">
+      <div class="hint" id="splash-logo-hint"></div>
+      <button id="splash-logo-clear" style="margin-top:6px; font-size:13px; padding:6px 12px; display:none;">Logo entfernen</button>
+    </div>
+  </div>
+
   <h2>Steuerung: Bluetooth-Clicker</h2>
   <div class="key-row">
     <span>Taste A (Start / Fortsetzen)</span>
@@ -160,6 +195,13 @@
   </div>
 
   <button id="start-btn" class="primary">Turnier starten</button>
+</div>
+
+<div id="splash">
+  <div id="splash-top"></div>
+  <img id="splash-logo" src="" alt="">
+  <div id="splash-bottom"></div>
+  <div id="splash-hint">Taste A zum Fortfahren</div>
 </div>
 
 <div id="display">
@@ -189,8 +231,11 @@
     groupMode: 'none', yellowTone: false, touchFallback: true,
     keyA: null, keyB: null,
     textShoot: 'Schießzeit', textWarning: 'An die Linie',
-    textStartHint: 'Taste A zum Starten', textTimeUp: 'Zeit abgelaufen'
+    textStartHint: 'Taste A zum Starten', textTimeUp: 'Zeit abgelaufen',
+    splashEnabled: false, splashTop: '', splashBottom: '', splashBg: '#1a1a2e'
   };
+
+  var SPLASH_LOGO_KEY = 'bogen-ampel-splash-logo';
 
   var STORAGE_KEY = 'bogen-ampel-config';
 
@@ -225,7 +270,11 @@
     textShoot: $('cfg-textShoot'),
     textWarning: $('cfg-textWarning'),
     textStartHint: $('cfg-textStartHint'),
-    textTimeUp: $('cfg-textTimeUp')
+    textTimeUp: $('cfg-textTimeUp'),
+    splashEnabled: $('cfg-splashEnabled'),
+    splashTop: $('cfg-splashTop'),
+    splashBottom: $('cfg-splashBottom'),
+    splashBg: $('cfg-splashBg')
   };
 
   function applyConfigToFields() {
@@ -242,6 +291,20 @@
     fields.textTimeUp.value = config.textTimeUp;
     $('code-a').textContent = config.keyA || 'nicht gesetzt';
     $('code-b').textContent = config.keyB || 'nicht gesetzt';
+    fields.splashEnabled.checked = !!config.splashEnabled;
+    fields.splashTop.value = config.splashTop;
+    fields.splashBottom.value = config.splashBottom;
+    fields.splashBg.value = config.splashBg;
+    $('splash-config').style.display = config.splashEnabled ? 'block' : 'none';
+    // Logo aus localStorage laden
+    var storedLogo = localStorage.getItem(SPLASH_LOGO_KEY);
+    if (storedLogo) {
+      $('splash-logo-hint').textContent = 'Logo gespeichert ✓';
+      $('splash-logo-clear').style.display = 'inline-block';
+    } else {
+      $('splash-logo-hint').textContent = '';
+      $('splash-logo-clear').style.display = 'none';
+    }
   }
 
   function readFieldsIntoConfig() {
@@ -256,11 +319,45 @@
     config.textWarning = fields.textWarning.value;
     config.textStartHint = fields.textStartHint.value;
     config.textTimeUp = fields.textTimeUp.value;
+    config.splashEnabled = fields.splashEnabled.checked;
+    config.splashTop = fields.splashTop.value;
+    config.splashBottom = fields.splashBottom.value;
+    config.splashBg = fields.splashBg.value;
     saveConfig();
   }
 
   Object.keys(fields).forEach(function (k) {
     fields[k].addEventListener('change', readFieldsIntoConfig);
+  });
+
+  // Splash-Toggle: Config-Block ein-/ausblenden
+  $('cfg-splashEnabled').addEventListener('change', function () {
+    $('splash-config').style.display = this.checked ? 'block' : 'none';
+    readFieldsIntoConfig();
+  });
+
+  // Logo-Upload
+  $('cfg-splashLogo').addEventListener('change', function () {
+    var file = this.files && this.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      try {
+        localStorage.setItem(SPLASH_LOGO_KEY, e.target.result);
+        $('splash-logo-hint').textContent = 'Logo gespeichert ✓';
+        $('splash-logo-clear').style.display = 'inline-block';
+      } catch (err) {
+        $('splash-logo-hint').textContent = 'Fehler: Datei zu groß?';
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+
+  $('splash-logo-clear').addEventListener('click', function () {
+    localStorage.removeItem(SPLASH_LOGO_KEY);
+    $('cfg-splashLogo').value = '';
+    $('splash-logo-hint').textContent = '';
+    $('splash-logo-clear').style.display = 'none';
   });
 
   var presetsEl = $('presets');
@@ -382,6 +479,7 @@
     currentPass: 1,
     currentGroupIndex: 0,
     phase: 'bereit', // bereit | warning | shooting | yellow | red_end | fertig
+    // screen: 'setup' | 'splash' | 'display'
     phaseStart: 0,
     phaseDuration: 0,
     paused: false,
@@ -453,6 +551,17 @@
         goToBereit();
       } else {
         state.phase = 'fertig';
+        if (config.splashEnabled) {
+          // kurze Verzögerung damit render() einmal 'fertig' zeigt, dann Splash
+          setTimeout(function () {
+            showSplash(function () {
+              // nach Splash zurück zu Bereit (Passen-Reset) oder einfach stehen lassen
+              // Wir zeigen nur den Splash, danach bleibt fertig-Screen
+              state.screen = 'display';
+              splashEl.classList.remove('active');
+            });
+          }, 2000);
+        }
       }
     }
   }
@@ -482,6 +591,7 @@
   // ---------------- Key / touch actions ----------------
   function actionA() {
     unlockAudio();
+    if (state.screen === 'splash') { dismissSplash(); return; }
     if (state.paused) { resumeFromAlarm(); return; }
     if (state.phase === 'bereit') { startWarning(); return; }
     // otherwise ignore (already running)
@@ -510,13 +620,14 @@
   }
 
   window.addEventListener('keydown', function (e) {
-    if (state.screen !== 'display') return;
+    if (state.screen !== 'display' && state.screen !== 'splash') return;
     var keyId = e.code || e.key;
     if (config.keyA && keyId === config.keyA) { e.preventDefault(); actionA(); }
     else if (config.keyB && keyId === config.keyB) { e.preventDefault(); actionBClickEvent(); }
   });
 
   $('touch-a').addEventListener('click', function () {
+    if (state.screen === 'splash') { actionA(); return; }
     if (!config.touchFallback) return;
     actionA();
   });
@@ -529,11 +640,13 @@
   $('dg-exit').addEventListener('click', function () {
     state.screen = 'setup';
     $('display').classList.remove('active');
+    splashEl.classList.remove('active');
     $('setup').classList.remove('hidden');
   });
 
   // ---------------- Render loop ----------------
   var displayEl = $('display');
+  var splashEl = $('splash');
   var labelEl = $('dg-label');
   var timerEl = $('dg-timer');
   var groupEl = $('dg-group');
@@ -548,6 +661,8 @@
   }
 
   function render() {
+    if (state.screen === 'setup') return;
+    if (state.screen === 'splash') return; // splash ist statisch, kein render nötig
     if (state.screen !== 'display') return;
 
     displayEl.className = 'active phase-' + state.phase + (state.paused ? ' paused' : '');
@@ -594,7 +709,7 @@
   }
 
   function tick() {
-    if (state.screen === 'display' && !state.paused) {
+    if (state.screen === 'display' && !state.paused) { // eslint-disable-line
       if (state.phase === 'warning' || state.phase === 'shooting' || state.phase === 'yellow' || state.phase === 'red_end') {
         var elapsed = Date.now() - state.phaseStart;
         var remaining = state.phaseDuration - elapsed;
@@ -615,6 +730,51 @@
   }
   requestAnimationFrame(tick);
 
+  // ---------------- Splash helpers ----------------
+  function showSplash(afterSplash) {
+    // afterSplash: Callback wenn Splash dismissed wird
+    state._splashCallback = afterSplash;
+    state.screen = 'splash';
+
+    var logo = localStorage.getItem(SPLASH_LOGO_KEY);
+    var imgEl = $('splash-logo');
+    if (logo) {
+      imgEl.src = logo;
+      imgEl.classList.add('show');
+    } else {
+      imgEl.src = '';
+      imgEl.classList.remove('show');
+    }
+    $('splash-top').textContent = config.splashTop;
+    $('splash-bottom').textContent = config.splashBottom;
+    splashEl.style.background = config.splashBg;
+    // Textfarbe automatisch hell/dunkel je nach Hintergrund
+    splashEl.style.color = splashBgIsDark(config.splashBg) ? '#ffffff' : '#111111';
+    splashEl.classList.add('active');
+  }
+
+  function splashBgIsDark(hex) {
+    // Einfaches Luminanz-Check: < 0.4 → dunkel
+    var r = parseInt(hex.slice(1,3),16);
+    var g = parseInt(hex.slice(3,5),16);
+    var b = parseInt(hex.slice(5,7),16);
+    return (0.299*r + 0.587*g + 0.114*b) / 255 < 0.4;
+  }
+
+  function dismissSplash() {
+    splashEl.classList.remove('active');
+    var cb = state._splashCallback;
+    state._splashCallback = null;
+    if (cb) cb();
+  }
+
+  function enterDisplay() {
+    state.screen = 'display';
+    $('setup').classList.add('hidden');
+    displayEl.classList.add('active');
+    requestWakeLock();
+  }
+
   // ---------------- Start tournament ----------------
   $('start-btn').addEventListener('click', function () {
     readFieldsIntoConfig();
@@ -625,11 +785,14 @@
     state.currentPass = 1;
     state.currentGroupIndex = 0;
     goToBereit();
-    state.screen = 'display';
 
     $('setup').classList.add('hidden');
-    displayEl.classList.add('active');
-    requestWakeLock();
+
+    if (config.splashEnabled) {
+      showSplash(function () { enterDisplay(); });
+    } else {
+      enterDisplay();
+    }
   });
 
   // ---------------- Service worker ----------------
