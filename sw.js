@@ -1,4 +1,4 @@
-const CACHE = 'bogen-ampel-v2c';
+const CACHE = 'bogen-ampel-v2f';
 const ASSETS = [
   './',
   './index.html',

@@ -64,7 +64,7 @@
   #dg-group { font-size: 6vw; font-weight: 700; margin-top: 2vh; }
   #dg-pass { font-size: 2.4vw; margin-top: .8vh; opacity: .7; }
   #dg-sub { font-size: 3.2vw; margin-top: 1.5vh; opacity: .85; }
-  #dg-exit { position: absolute; top: 14px; left: 14px; opacity: .5; font-size: 13px; padding: 8px 12px; z-index: 10; }
+  #dg-exit, #splash-exit { position: absolute; top: 14px; left: 14px; opacity: .5; font-size: 13px; padding: 8px 12px; z-index: 10; }
   .touch-zone { position: absolute; top: 0; bottom: 0; width: 50%; z-index: 1; }
   #touch-a { left: 0; }
   #touch-b { right: 0; }
@@ -198,6 +198,7 @@
 </div>
 
 <div id="splash">
+  <button id="splash-exit">◀ Setup</button>
   <div id="splash-top"></div>
   <img id="splash-logo" src="" alt="">
   <div id="splash-bottom"></div>
@@ -627,21 +628,13 @@
   });
 
   $('touch-a').addEventListener('click', function () {
-    if (state.screen === 'splash') { actionA(); return; }
     if (!config.touchFallback) return;
     actionA();
   });
   $('touch-b').addEventListener('click', function () {
     if (!config.touchFallback) return;
     if (state.paused) return;
-    forceAdvance(); // touch has no alarm, always single-click behaviour
-  });
-
-  $('dg-exit').addEventListener('click', function () {
-    state.screen = 'setup';
-    $('display').classList.remove('active');
-    splashEl.classList.remove('active');
-    $('setup').classList.remove('hidden');
+    forceAdvance();
   });
 
   // ---------------- Render loop ----------------
@@ -651,6 +644,21 @@
   var timerEl = $('dg-timer');
   var groupEl = $('dg-group');
   var passEl = $('dg-pass');
+
+  // Splash: Klick irgendwo (außer Exit-Button) = dismiss
+  splashEl.addEventListener('click', function (e) {
+    if (e.target === $('splash-exit')) return;
+    actionA();
+  });
+
+  function goToSetup() {
+    state.screen = 'setup';
+    $('display').classList.remove('active');
+    splashEl.classList.remove('active');
+    $('setup').classList.remove('hidden');
+  }
+  $('dg-exit').addEventListener('click', goToSetup);
+  $('splash-exit').addEventListener('click', goToSetup);
   var subEl = $('dg-sub');
 
   function fmt(ms) {
