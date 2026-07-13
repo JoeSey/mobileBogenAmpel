@@ -416,7 +416,7 @@
     state.phaseStart = Date.now();
     state.phaseDuration = config.warningTime * 1000;
     state.paused = false;
-    honkPattern(2, 250);
+    honkPattern(2, 290);
   }
 
   function startShooting() {
@@ -439,7 +439,7 @@
     state.phaseStart = Date.now();
     state.phaseDuration = 2500;
     state.paused = false;
-    honkPattern(3, 250);
+    honkPattern(3, 290);
   }
 
   function advanceAfterRedEnd() {
@@ -470,7 +470,7 @@
       var elapsed = Date.now() - state.phaseStart;
       state.pausedRemaining = Math.max(0, state.phaseDuration - elapsed);
       state.paused = true;
-      honkPattern(5, 190);
+      honkPattern(5, 280);
     }
   }
 
